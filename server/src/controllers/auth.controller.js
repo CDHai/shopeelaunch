@@ -1,5 +1,7 @@
 import User from '../models/user.model.js';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
+import { sendResetPasswordEmail } from '../services/email.service.js';
 
 // @desc    Register user
 // @route   POST /api/auth/register
@@ -69,15 +71,12 @@ const forgotPassword = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Generate reset token
     const resetToken = crypto.randomBytes(20).toString('hex');
     user.resetPasswordToken = resetToken;
-    user.resetPasswordExpire = Date.now() + 3600000; // 1 hour
+    user.resetPasswordExpire = Date.now() + 3600000;
     await user.save();
-
-    // Send email with reset link
-    // TODO: Implement email sending
     
+    await sendResetPasswordEmail(email, resetToken);
     res.json({ message: 'Password reset link sent to email' });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -85,6 +84,33 @@ const forgotPassword = async (req, res) => {
 };
 export { forgotPassword };
 
+
+const resetPassword = async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { password } = req.body;
+
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpire: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid or expired reset token' });
+    }
+
+    user.password = password;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+    await user.save();
+
+    res.json({ message: 'Password reset successful' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export { resetPassword };
 
 // Generate JWT
 const generateToken = (id) => {

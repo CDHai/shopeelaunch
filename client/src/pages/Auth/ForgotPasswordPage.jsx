@@ -13,10 +13,24 @@ const ForgotPasswordPage = () => {
     setIsLoading(true);
     
     try {
+      const response = await fetch('http://localhost:5000/api/auth/forgot-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+  
+      const data = await response.json();
+  
+      if (!response.ok) {
+        throw new Error(data.message);
+      }
+  
       toast.success('Reset password link has been sent to your email');
       setEmail('');
     } catch (error) {
-      toast.error(error.message);
+      toast.error(error.message || 'Failed to send reset link');
     } finally {
       setIsLoading(false);
     }
