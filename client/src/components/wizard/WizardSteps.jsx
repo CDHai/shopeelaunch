@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { LineChart, Line, PieChart, Pie, ResponsiveContainer, XAxis, YAxis, Tooltip, Cell } from 'recharts';
 import { shopeeCategories } from '../../data/shopeeCategories';
+import { ChevronDownIcon, ChevronUpIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 
 // Step 1: Category Selection
 export const CategoryStep = ({ formData, setFormData }) => {
@@ -1314,519 +1315,539 @@ export const BusinessPlanStep = ({ formData, setFormData }) => {
   
 // Step 5: Product Setup
 export const ProductSetupStep = ({ formData, setFormData }) => {
-  const [loading, setLoading] = useState(false);
-  const [aiSuggestions, setAiSuggestions] = useState(null);
-  const [localFormData, setLocalFormData] = useState({
-    name: formData.product?.name || '',
-    description: formData.product?.description || '',
-    features: formData.product?.features || [],
-    price: formData.product?.price || '',
-    variations: formData.product?.variations || []
-  });
+  // State cho danh sách sản phẩm
+  const [products, setProducts] = useState(formData.products || []);
+  const [expandedProduct, setExpandedProduct] = useState(null);
+  const [optimizingProduct, setOptimizingProduct] = useState(null);
+  const [optimizationResults, setOptimizationResults] = useState({});
 
-  const [showPreview, setShowPreview] = useState(false);
-
-  const handleChange = (field, value) => {
-    setLocalFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+  // Helper function để format tiền VND
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND'
+    }).format(amount);
   };
 
-  const addFeature = () => {
-    setLocalFormData(prev => ({
-      ...prev,
-      features: [...prev.features, '']
-    }));
+  // Thêm sản phẩm mới
+  const handleAddProduct = () => {
+    const newProduct = {
+      id: Date.now(),
+      name: '',
+      description: '',
+      price: '',
+      features: [],
+      variations: [],
+      optimized: false
+    };
+    setProducts(prev => [...prev, newProduct]);
+    setExpandedProduct(newProduct.id);
+    
+    // Cập nhật form data
+    setFormData({
+      ...formData,
+      products: [...products, newProduct]
+    });
   };
 
-  const updateFeature = (index, value) => {
-    const newFeatures = [...localFormData.features];
-    newFeatures[index] = value;
-    handleChange('features', newFeatures);
-  };
-
-  const removeFeature = (index) => {
-    const newFeatures = localFormData.features.filter((_, i) => i !== index);
-    handleChange('features', newFeatures);
-  };
-
-  const addVariation = () => {
-    setLocalFormData(prev => ({
-      ...prev,
-      variations: [...prev.variations, { name: '', options: [], prices: [] }]
-    }));
-  };
-
-  const updateVariation = (index, field, value) => {
-    const newVariations = [...localFormData.variations];
-    newVariations[index][field] = value;
-    handleChange('variations', newVariations);
-  };
-
-  const removeVariation = (index) => {
-    const newVariations = localFormData.variations.filter((_, i) => i !== index);
-    handleChange('variations', newVariations);
-  };
-
-  const optimizeContent = async () => {
-    if (!localFormData.name || !localFormData.description) {
-      alert('Vui lòng điền tên và mô tả sản phẩm');
-      return;
+  // Xóa sản phẩm
+  const handleDeleteProduct = (productId) => {
+    const newProducts = products.filter(p => p.id !== productId);
+    setProducts(newProducts);
+    if (expandedProduct === productId) {
+      setExpandedProduct(null);
     }
+    
+    setFormData({
+      ...formData,
+      products: newProducts
+    });
+  };
 
-    setLoading(true);
+  // Cập nhật thông tin sản phẩm
+  const handleUpdateProduct = (productId, field, value) => {
+    const newProducts = products.map(p => 
+      p.id === productId ? { ...p, [field]: value } : p
+    );
+    setProducts(newProducts);
+    
+    setFormData({
+      ...formData,
+      products: newProducts
+    });
+  };
+
+  // Thêm đặc điểm sản phẩm
+  const handleAddFeature = (productId) => {
+    const newProducts = products.map(p => 
+      p.id === productId 
+        ? { ...p, features: [...p.features, ''] }
+        : p
+    );
+    setProducts(newProducts);
+    
+    setFormData({
+      ...formData,
+      products: newProducts
+    });
+  };
+
+  // Cập nhật đặc điểm
+  const handleUpdateFeature = (productId, index, value) => {
+    const newProducts = products.map(p => {
+      if (p.id === productId) {
+        const newFeatures = [...p.features];
+        newFeatures[index] = value;
+        return { ...p, features: newFeatures };
+      }
+      return p;
+    });
+    setProducts(newProducts);
+    
+    setFormData({
+      ...formData,
+      products: newProducts
+    });
+  };
+
+  // Xóa đặc điểm
+  const handleDeleteFeature = (productId, index) => {
+    const newProducts = products.map(p => {
+      if (p.id === productId) {
+        const newFeatures = p.features.filter((_, i) => i !== index);
+        return { ...p, features: newFeatures };
+      }
+      return p;
+    });
+    setProducts(newProducts);
+    
+    setFormData({
+      ...formData,
+      products: newProducts
+    });
+  };
+
+  // Thêm phân loại
+  const handleAddVariation = (productId) => {
+    const newProducts = products.map(p => 
+      p.id === productId 
+        ? { ...p, variations: [...p.variations, { name: '', options: [] }] }
+        : p
+    );
+    setProducts(newProducts);
+    
+    setFormData({
+      ...formData,
+      products: newProducts
+    });
+  };
+
+  // Cập nhật phân loại
+  const handleUpdateVariation = (productId, index, field, value) => {
+    const newProducts = products.map(p => {
+      if (p.id === productId) {
+        const newVariations = [...p.variations];
+        newVariations[index] = { ...newVariations[index], [field]: value };
+        return { ...p, variations: newVariations };
+      }
+      return p;
+    });
+    setProducts(newProducts);
+    
+    setFormData({
+      ...formData,
+      products: newProducts
+    });
+  };
+
+  // Xóa phân loại
+  const handleDeleteVariation = (productId, index) => {
+    const newProducts = products.map(p => {
+      if (p.id === productId) {
+        const newVariations = p.variations.filter((_, i) => i !== index);
+        return { ...p, variations: newVariations };
+      }
+      return p;
+    });
+    setProducts(newProducts);
+    
+    setFormData({
+      ...formData,
+      products: newProducts
+    });
+  };
+
+  // Tối ưu sản phẩm
+  const handleOptimizeProduct = async (productId) => {
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+
+    setOptimizingProduct(productId);
     try {
-      // Simulate API call
+      // Giả lập API call để tối ưu sản phẩm
       await new Promise(resolve => setTimeout(resolve, 2000));
 
-      const suggestions = {
+      const optimizedData = {
         name: {
-          optimized: `${formData.branding?.suggestions?.names[0]?.name || ''} - ${localFormData.name}`,
-          seoTitle: `${localFormData.name} | ${formData.categories[0]?.name || ''} | Chính Hãng`,
+          optimized: `${product.name} - Chính Hãng Cao Cấp`,
+          seoTitle: `${product.name} | Chính Hãng | Giá Tốt Nhất`,
           variations: [
-            `${localFormData.name} - Cao Cấp Chính Hãng`,
-            `${localFormData.name} - Bán Chạy Số 1`,
-            `${localFormData.name} - Giá Tốt`
+            `${product.name} - Bán Chạy Số 1`,
+            `${product.name} - Freeship Extra`,
+            `${product.name} - Ưu Đãi Shock`
           ]
         },
         description: {
-          summary: "Đoạn mô tả ngắn tối ưu cho hiển thị trên kết quả tìm kiếm",
+          summary: `${product.description.slice(0, 150)}...`,
           full: `
-            🔥 THÔNG TIN SẢN PHẨM
-            ${localFormData.name}
+🔥 THÔNG TIN SẢN PHẨM
+${product.name}
 
-            ✨ ĐẶC ĐIỂM NỔI BẬT
-            ${localFormData.features.map(f => `• ${f}`).join('\n')}
+✨ ĐẶC ĐIỂM NỔI BẬT
+${product.features.map(f => `• ${f}`).join('\n')}
 
-            🎁 QUYỀN LỢI KHÁCH HÀNG
-            • Sản phẩm chính hãng 100%
-            • Hoàn tiền 100% nếu phát hiện hàng giả
-            • Đổi trả miễn phí trong 7 ngày
-            • Freeship toàn quốc cho đơn từ 500k
+🎁 QUYỀN LỢI KHÁCH HÀNG
+• Sản phẩm chính hãng 100%
+• Hoàn tiền 100% nếu phát hiện hàng giả
+• Đổi trả miễn phí trong 7 ngày
+• Freeship toàn quốc cho đơn từ 500k
 
-            📞 HOTLINE HỖ TRỢ: 0123.456.789
-          `,
-          sections: [
-            {
-              title: "THÔNG TIN CHI TIẾT",
-              content: "Mô tả chi tiết về sản phẩm..."
-            },
-            {
-              title: "HƯỚNG DẪN SỬ DỤNG",
-              content: "Các bước sử dụng sản phẩm..."
-            }
-          ]
+📞 HOTLINE HỖ TRỢ: 0123.456.789
+          `
         },
-        keywords: {
-          primary: [
-            `${localFormData.name} chính hãng`,
-            `${localFormData.name} giá rẻ`,
-            `mua ${localFormData.name}`
+        seo: {
+          keywords: [
+            `${product.name} chính hãng`,
+            `mua ${product.name}`,
+            `${product.name} giá rẻ`,
+            'freeship',
+            'shop uy tín'
           ],
-          secondary: [
-            "chính hãng",
-            "giá tốt",
-            "freeship"
-          ],
-          trending: [
-            "hot trend 2024",
-            "bán chạy",
-            "review tốt"
-          ]
-        },
-        images: {
-          recommended: 9,
-          types: [
-            "Hình ảnh sản phẩm chính diện",
-            "Hình ảnh chi tiết sản phẩm",
-            "Hình ảnh kích thước/thông số",
-            "Hình ảnh người dùng thực tế"
-          ]
-        },
-        competition: {
-          averagePrice: 250000,
-          priceRange: {
-            low: 199000,
-            high: 299000
-          },
-          topKeywords: [
-            "chính hãng",
-            "freeship",
-            "hot trend"
+          tags: [
+            'Chính hãng',
+            'Freeship',
+            'Hoàn tiền 100%',
+            'Đổi trả 7 ngày'
           ]
         }
       };
 
-      setAiSuggestions(suggestions);
-      setFormData(prev => ({
+      // Cập nhật kết quả tối ưu
+      setOptimizationResults(prev => ({
         ...prev,
-        product: {
-          ...localFormData,
-          aiSuggestions: suggestions
-        }
+        [productId]: optimizedData
       }));
 
+      // Cập nhật sản phẩm đã được tối ưu
+      const newProducts = products.map(p => 
+        p.id === productId ? { ...p, optimized: true } : p
+      );
+      setProducts(newProducts);
+      
+      setFormData({
+        ...formData,
+        products: newProducts
+      });
+
     } catch (error) {
-      console.error('Failed to optimize content:', error);
+      console.error('Failed to optimize product:', error);
     } finally {
-      setLoading(false);
+      setOptimizingProduct(null);
     }
   };
 
   return (
     <div className="space-y-8">
-      {/* Basic Product Information */}
+      {/* Products List */}
       <div className="bg-white p-6 rounded-lg shadow">
-        <h3 className="text-lg font-medium text-gray-900 mb-6">Thông tin sản phẩm</h3>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Tên sản phẩm
-            </label>
-            <input
-              type="text"
-              value={localFormData.name}
-              onChange={(e) => handleChange('name', e.target.value)}
-              className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              placeholder="Nhập tên sản phẩm"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Mô tả sản phẩm
-            </label>
-            <textarea
-              value={localFormData.description}
-              onChange={(e) => handleChange('description', e.target.value)}
-              rows={4}
-              className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              placeholder="Mô tả chi tiết về sản phẩm"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Giá bán
-            </label>
-            <div className="mt-1 relative rounded-md shadow-sm">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <span className="text-gray-500">₫</span>
-              </div>
-              <input
-                type="number"
-                value={localFormData.price}
-                onChange={(e) => handleChange('price', e.target.value)}
-                className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-7 pr-12 sm:text-sm border-gray-300 rounded-md"
-                placeholder="0"
-              />
-            </div>
-          </div>
-
-          {/* Product Features */}
-          <div>
-            <div className="flex justify-between items-center mb-2">
-              <label className="block text-sm font-medium text-gray-700">
-                Đặc điểm nổi bật
-              </label>
-              <button
-                type="button"
-                onClick={addFeature}
-                className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                Thêm đặc điểm
-              </button>
-            </div>
-            <div className="space-y-2">
-              {localFormData.features.map((feature, index) => (
-                <div key={index} className="flex gap-2">
-                  <input
-                    type="text"
-                    value={feature}
-                    onChange={(e) => updateFeature(index, e.target.value)}
-                    className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                    placeholder="Nhập đặc điểm sản phẩm"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeFeature(index)}
-                    className="inline-flex items-center p-1.5 border border-transparent rounded-full text-red-600 hover:bg-red-100 focus:outline-none"
-                  >
-                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Product Variations */}
-          <div>
-            <div className="flex justify-between items-center mb-2">
-              <label className="block text-sm font-medium text-gray-700">
-                Phân loại sản phẩm
-              </label>
-              <button
-                type="button"
-                onClick={addVariation}
-                className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                Thêm phân loại
-              </button>
-            </div>
-            <div className="space-y-4">
-              {localFormData.variations.map((variation, index) => (
-                <div key={index} className="border rounded-lg p-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <input
-                      type="text"
-                      value={variation.name}
-                      onChange={(e) => updateVariation(index, 'name', e.target.value)}
-                      className="block w-2/3 border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                      placeholder="Tên phân loại (VD: Màu sắc, Size)"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeVariation(index)}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      Xóa
-                    </button>
-                  </div>
-                  <div className="mt-2">
-                    <input
-                      type="text"
-                      value={variation.options.join(', ')}
-                      onChange={(e) => updateVariation(index, 'options', e.target.value.split(',').map(o => o.trim()))}
-                      className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                      placeholder="Các tùy chọn, phân cách bằng dấu phẩy (VD: Đỏ, Xanh, Vàng)"
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-lg font-medium text-gray-900">
+            Thiết lập sản phẩm ({products.length})
+          </h3>
           <button
-            onClick={optimizeContent}
-            disabled={loading}
-            className="w-full px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed"
+            onClick={handleAddProduct}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
           >
-            {loading ? 'Đang tối ưu...' : 'Tối ưu nội dung sản phẩm'}
+            <PlusIcon className="h-5 w-5 mr-2" />
+            Thêm sản phẩm
           </button>
         </div>
-      </div>
 
-      {/* AI Optimized Content */}
-      {loading ? (
-        <div className="text-center py-6">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="mt-2 text-gray-600">Đang tối ưu nội dung sản phẩm...</p>
-        </div>
-      ) : aiSuggestions && (
-        <>
-          {/* Optimized Titles */}
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h4 className="text-lg font-medium text-gray-900 mb-4">Tên sản phẩm đề xuất</h4>
-            <div className="space-y-4">
-              <div className="p-4 bg-indigo-50 rounded-lg">
-                <p className="font-medium text-indigo-900">{aiSuggestions.name.optimized}</p>
-                <p className="mt-1 text-sm text-indigo-600">Tên chính</p>
-              </div>
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <p className="font-medium">{aiSuggestions.name.seoTitle}</p>
-                <p className="mt-1 text-sm text-gray-600">Tiêu đề SEO</p>
-              </div>
-              <div className="space-y-2">
-                {aiSuggestions.name.variations.map((title, index) => (
-                  <div key={index} className="p-3 border rounded-lg">
-                    {title}
+        {/* Product List */}
+        <div className="space-y-4">
+          {products.length === 0 ? (
+            <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
+              <p className="text-gray-500">
+                Chưa có sản phẩm nào. Bấm "Thêm sản phẩm" để bắt đầu.
+              </p>
+            </div>
+          ) : (
+            products.map(product => (
+              <div key={product.id} className="border rounded-lg hover:border-gray-300">
+                {/* Product Header */}
+                <div className="p-4 flex justify-between items-center">
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      value={product.name}
+                      onChange={(e) => handleUpdateProduct(product.id, 'name', e.target.value)}
+                      className="block w-full border-0 p-0 text-gray-900 placeholder-gray-500 focus:ring-0 sm:text-sm"
+                      placeholder="Tên sản phẩm"
+                    />
+                    {product.price && (
+                      <p className="mt-1 text-sm text-gray-500">
+                        {formatCurrency(product.price)}
+                      </p>
+                    )}
                   </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Optimized Description */}
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h4 className="text-lg font-medium text-gray-900 mb-4">Mô tả sản phẩm đề xuất</h4>
-            
-            <div className="space-y-6">
-              <div>
-                <h5 className="font-medium mb-2">Mô tả tóm tắt</h5>
-                <p className="text-gray-600 bg-gray-50 p-4 rounded-lg">
-                  {aiSuggestions.description.summary}
-                </p>
-              </div>
-
-              <div>
-                <h5 className="font-medium mb-2">Mô tả đầy đủ</h5>
-                <div className="whitespace-pre-wrap bg-gray-50 p-4 rounded-lg text-gray-600">
-                  {aiSuggestions.description.full}
-                </div>
-              </div>
-
-              <div>
-                <h5 className="font-medium mb-2">Các phần mô tả chi tiết</h5>
-                <div className="space-y-4">
-                  {aiSuggestions.description.sections.map((section, index) => (
-                    <div key={index} className="border rounded-lg p-4">
-                      <h6 className="font-medium text-indigo-600 mb-2">{section.title}</h6>
-                      <p className="text-gray-600">{section.content}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* SEO Keywords */}
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h4 className="text-lg font-medium text-gray-900 mb-4">Từ khóa SEO</h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
-                <h5 className="font-medium text-indigo-600 mb-3">Từ khóa chính</h5>
-                <div className="space-y-2">
-                  {aiSuggestions.keywords.primary.map((keyword, index) => (
-                    <div key={index} className="p-2 bg-indigo-50 rounded text-sm">
-                      {keyword}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <h5 className="font-medium text-green-600 mb-3">Từ khóa phụ</h5>
-                <div className="space-y-2">
-                  {aiSuggestions.keywords.secondary.map((keyword, index) => (
-                    <div key={index} className="p-2 bg-green-50 rounded text-sm">
-                      {keyword}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <h5 className="font-medium text-purple-600 mb-3">Từ khóa xu hướng</h5>
-                <div className="space-y-2">
-                  {aiSuggestions.keywords.trending.map((keyword, index) => (
-                    <div key={index} className="p-2 bg-purple-50 rounded text-sm">
-                      {keyword}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Image Guidelines */}
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h4 className="text-lg font-medium text-gray-900 mb-4">Hướng dẫn hình ảnh</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h5 className="font-medium mb-3">Yêu cầu hình ảnh</h5>
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <p className="text-sm text-gray-600">
-                    Sản phẩm cần tối thiểu <span className="font-medium text-indigo-600">{aiSuggestions.images.recommended}</span> hình ảnh
-                  </p>
-                </div>
-                <div className="mt-4 space-y-2">
-                  {aiSuggestions.images.types.map((type, index) => (
-                    <div key={index} className="flex items-start space-x-2">
-                      <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center bg-indigo-100 text-indigo-600 rounded-full text-xs">
-                        {index + 1}
-                      </span>
-                      <span className="text-sm text-gray-600">{type}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <h5 className="font-medium mb-3">Phân tích đối thủ</h5>
-                <div className="space-y-4">
-                  <div className="p-4 bg-gray-50 rounded-lg">
-                    <p className="text-sm text-gray-600">Giá trung bình thị trường</p>
-                    <p className="text-lg font-medium text-indigo-600">
-                      {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(aiSuggestions.competition.averagePrice)}
-                    </p>
-                  </div>
-
-                  <div className="p-4 bg-gray-50 rounded-lg">
-                    <p className="text-sm text-gray-600">Khoảng giá phổ biến</p>
-                    <p className="text-lg font-medium text-indigo-600">
-                      {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(aiSuggestions.competition.priceRange.low)} - {' '}
-                      {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(aiSuggestions.competition.priceRange.high)}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-sm font-medium mb-2">Từ khóa phổ biến của đối thủ</p>
-                    <div className="flex flex-wrap gap-2">
-                      {aiSuggestions.competition.topKeywords.map((keyword, index) => (
-                        <span key={index} className="px-2 py-1 bg-gray-100 rounded text-sm">
-                          {keyword}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Shopee Preview */}
-          <div className="bg-white p-6 rounded-lg shadow">
-            <div className="flex justify-between items-center mb-4">
-              <h4 className="text-lg font-medium text-gray-900">Xem trước trên Shopee</h4>
-              <button
-                onClick={() => setShowPreview(!showPreview)}
-                className="text-sm text-indigo-600 hover:text-indigo-700"
-              >
-                {showPreview ? 'Ẩn xem trước' : 'Hiện xem trước'}
-              </button>
-            </div>
-
-            {showPreview && (
-              <div className="border rounded-lg p-4">
-                <div className="aspect-w-1 aspect-h-1 w-full mb-4">
-                  <div className="bg-gray-200 rounded-lg"></div>
-                </div>
-                <h5 className="text-lg font-medium">{aiSuggestions.name.optimized}</h5>
-                <div className="mt-2 flex items-center space-x-2">
-                  <span className="text-2xl font-bold text-red-600">
-                    {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(localFormData.price)}
-                  </span>
-                  {aiSuggestions.competition.averagePrice > localFormData.price && (
-                    <span className="px-2 py-1 bg-red-100 text-red-800 text-sm rounded">
-                      Giảm {Math.round((1 - localFormData.price / aiSuggestions.competition.averagePrice) * 100)}%
-                    </span>
-                  )}
-                </div>
-                <div className="mt-4 prose max-w-none text-sm text-gray-600">
-                  {aiSuggestions.description.summary}
-                </div>
-                {localFormData.variations.length > 0 && (
-                  <div className="mt-4">
-                    <p className="text-sm font-medium text-gray-700 mb-2">Phân loại:</p>
-                    <div className="flex flex-wrap gap-2">
-                      {localFormData.variations.flatMap(variation =>
-                        variation.options.map((option, i) => (
-                          <span key={`${variation.name}-${i}`} className="px-3 py-1 bg-gray-100 rounded-lg text-sm">
-                            {option}
-                          </span>
-                        ))
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => setExpandedProduct(
+                        expandedProduct === product.id ? null : product.id
                       )}
+                      className="p-2 hover:bg-gray-100 rounded-full"
+                    >
+                      {expandedProduct === product.id ? (
+                        <ChevronUpIcon className="h-5 w-5" />
+                      ) : (
+                        <ChevronDownIcon className="h-5 w-5" />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => handleDeleteProduct(product.id)}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded-full"
+                    >
+                      <TrashIcon className="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Product Details */}
+                {expandedProduct === product.id && (
+                  <div className="border-t p-4 space-y-4">
+                    {/* Basic Info */}
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Giá bán
+                        </label>
+                        <div className="mt-1 relative rounded-md shadow-sm">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <span className="text-gray-500">₫</span>
+                          </div>
+                          <input
+                            type="number"
+                            value={product.price}
+                            onChange={(e) => handleUpdateProduct(product.id, 'price', e.target.value)}
+                            className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-7 pr-12 sm:text-sm border-gray-300 rounded-md"
+                            placeholder="0"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Mô tả sản phẩm
+                        </label>
+                        <textarea
+                          value={product.description}
+                          onChange={(e) => handleUpdateProduct(product.id, 'description', e.target.value)}
+                          rows={4}
+                          className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                          placeholder="Mô tả chi tiết về sản phẩm của bạn"
+                        />
+                      </div>
                     </div>
+
+                    {/* Features */}
+                    <div>
+                      <div className="flex justify-between items-center mb-2">
+                        <label className="block text-sm font-medium text-gray-700">
+                          Đặc điểm sản phẩm
+                        </label>
+                        <button
+                          onClick={() => handleAddFeature(product.id)}
+                          className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200"
+                        >
+                          Thêm đặc điểm
+                        </button>
+                      </div>
+                      <div className="space-y-2">
+                        {product.features.map((feature, index) => (
+                          <div key={index} className="flex gap-2">
+                            <input
+                              type="text"
+                              value={feature}
+                              onChange={(e) => handleUpdateFeature(product.id, index, e.target.value)}
+                              className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                              placeholder="Nhập đặc điểm sản phẩm"
+                            />
+                            <button
+                              onClick={() => handleDeleteFeature(product.id, index)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <TrashIcon className="h-5 w-5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Variations */}
+                    <div>
+                      <div className="flex justify-between items-center mb-2">
+                        <label className="block text-sm font-medium text-gray-700">
+                          Phân loại sản phẩm
+                        </label>
+                        <button
+                          onClick={() => handleAddVariation(product.id)}
+                          className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200"
+                        >
+                          Thêm phân loại
+                        </button>
+                      </div>
+                      <div className="space-y-4">
+                        {product.variations.map((variation, index) => (
+                          <div key={index} className="border rounded-lg p-4">
+                            <div className="flex justify-between items-center mb-2">
+                              <input
+                                type="text"
+                                value={variation.name}
+                                onChange={(e) => handleUpdateVariation(product.id, index, 'name', e.target.value)}
+                                className="block w-2/3 border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                placeholder="Tên phân loại (VD: Màu sắc, Size)"
+                              />
+                              <button
+                                onClick={() => handleDeleteVariation(product.id, index)}
+                                className="text-red-600 hover:text-red-700"
+                              >
+                                <TrashIcon className="h-5 w-5" />
+                              </button>
+                            </div>
+                            <div className="mt-2">
+                              <input
+                                type="text"
+                                value={variation.options.join(', ')}
+                                onChange={(e) => handleUpdateVariation(
+                                  product.id,
+                                  index,
+                                  'options',
+                                  e.target.value.split(',').map(o => o.trim())
+                                )}
+                                className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                placeholder="Các tùy chọn, phân cách bằng dấu phẩy (VD: Đỏ, Xanh, Vàng)"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Optimize Button */}
+                    <div className="pt-4">
+                      <button
+                        onClick={() => handleOptimizeProduct(product.id)}
+                        disabled={optimizingProduct === product.id}
+                        className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400"
+                      >
+                        {optimizingProduct === product.id ? (
+                          <>
+                            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Đang tối ưu...
+                          </>
+                        ) : 'Tối ưu nội dung sản phẩm'}
+                      </button>
+                    </div>
+
+                    {/* Optimization Results */}
+                    {optimizationResults[product.id] && (
+                      <div className="mt-6 space-y-6">
+                        {/* Tên sản phẩm tối ưu */}
+                        <div className="bg-gray-50 rounded-lg p-4">
+                          <h4 className="text-base font-medium text-gray-900 mb-4">Tên sản phẩm tối ưu</h4>
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700">Tên chính</label>
+                              <div className="mt-1 p-3 bg-white rounded-md">
+                                {optimizationResults[product.id].name.optimized}
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700">Tiêu đề SEO</label>
+                              <div className="mt-1 p-3 bg-white rounded-md">
+                                {optimizationResults[product.id].name.seoTitle}
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700">Các biến thể tên</label>
+                              <div className="mt-1 space-y-2">
+                                {optimizationResults[product.id].name.variations.map((name, idx) => (
+                                  <div key={idx} className="p-3 bg-white rounded-md">
+                                    {name}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Mô tả tối ưu */}
+                        <div className="bg-gray-50 rounded-lg p-4">
+                          <h4 className="text-base font-medium text-gray-900 mb-4">Mô tả sản phẩm tối ưu</h4>
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700">Mô tả ngắn</label>
+                              <div className="mt-1 p-3 bg-white rounded-md">
+                                {optimizationResults[product.id].description.summary}
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700">Mô tả đầy đủ</label>
+                              <div className="mt-1 p-3 bg-white rounded-md whitespace-pre-wrap">
+                                {optimizationResults[product.id].description.full}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Từ khóa SEO */}
+                        <div className="bg-gray-50 rounded-lg p-4">
+                          <h4 className="text-base font-medium text-gray-900 mb-4">Từ khóa SEO</h4>
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700">Từ khóa chính</label>
+                              <div className="mt-1 flex flex-wrap gap-2">
+                                {optimizationResults[product.id].seo.keywords.map((keyword, idx) => (
+                                  <span key={idx} className="px-2 py-1 bg-indigo-100 text-indigo-800 rounded-full text-sm">
+                                    {keyword}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700">Tags</label>
+                              <div className="mt-1 flex flex-wrap gap-2">
+                                {optimizationResults[product.id].seo.tags.map((tag, idx) => (
+                                  <span key={idx} className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-sm">
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            )}
-          </div>
-        </>
-      )}
+            ))
+          )}
+        </div>
+      </div>
     </div>
   );
 };
@@ -1835,33 +1856,150 @@ export const ProductSetupStep = ({ formData, setFormData }) => {
 export const MarketingStep = ({ formData, setFormData }) => {
   const [loading, setLoading] = useState(false);
   const [marketingPlan, setMarketingPlan] = useState(null);
+  const [localFormData, setLocalFormData] = useState({
+    budget: formData.marketing?.budget || '',
+    selectedChannels: formData.marketing?.selectedChannels || [],
+    targetAudience: formData.marketing?.targetAudience || '',
+    objectives: formData.marketing?.objectives || []
+  });
+
+  const marketingChannels = [
+    {
+      id: 'shopee_ads',
+      name: 'Shopee Ads',
+      description: 'Quảng cáo trên nền tảng Shopee'
+    },
+    {
+      id: 'social_media',
+      name: 'Social Media',
+      description: 'Facebook, Instagram, TikTok'
+    },
+    {
+      id: 'influencer',
+      name: 'Influencer Marketing',
+      description: 'Hợp tác với KOLs và influencers'
+    },
+    {
+      id: 'email',
+      name: 'Email Marketing',
+      description: 'Gửi email cho khách hàng'
+    },
+    {
+      id: 'promotion',
+      name: 'Khuyến mãi',
+      description: 'Vouchers, Flash sale, Combo deals'
+    }
+  ];
 
   const handleChange = (field, value) => {
-    setFormData({
-      ...formData,
+    setLocalFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+
+    setFormData(prev => ({
+      ...prev,
       marketing: {
-        ...formData.marketing,
+        ...prev.marketing,
         [field]: value
       }
-    });
+    }));
   };
 
   const generateMarketingPlan = async () => {
+    if (!localFormData.budget || !localFormData.selectedChannels.length) {
+      alert('Vui lòng điền ngân sách và chọn ít nhất một kênh marketing');
+      return;
+    }
+
     setLoading(true);
     try {
-      const response = await fetch('/api/marketing/plan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          budget: formData.marketing.budget,
-          category: formData.specificCategory,
-          product: formData.product
-        })
-      });
+      // Giả lập API call
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
-      const plan = await response.json();
+      const plan = {
+        overview: {
+          totalBudget: parseInt(localFormData.budget),
+          duration: '30 ngày',
+          estimatedReach: '10,000 - 15,000 người',
+          expectedROI: '150-200%'
+        },
+        budgetAllocation: {
+          shopee_ads: Math.round(localFormData.budget * 0.4),
+          social_media: Math.round(localFormData.budget * 0.3),
+          influencer: Math.round(localFormData.budget * 0.2),
+          others: Math.round(localFormData.budget * 0.1)
+        },
+        calendar: [
+          {
+            day: 1,
+            activity: 'Khởi động chiến dịch Shopee Ads',
+            budget: Math.round(localFormData.budget * 0.1)
+          },
+          {
+            day: 5,
+            activity: 'Đăng bài social media đầu tiên',
+            budget: Math.round(localFormData.budget * 0.05)
+          },
+          {
+            day: 10,
+            activity: 'Phát hành voucher giảm giá 10%',
+            budget: Math.round(localFormData.budget * 0.15)
+          },
+          // ...thêm các hoạt động khác
+        ],
+        recommendations: {
+          shopeeAds: [
+            'Tối ưu từ khóa quảng cáo theo xu hướng tìm kiếm',
+            'Tập trung vào các khung giờ cao điểm',
+            'Sử dụng A/B testing để tối ưu hiệu quả'
+          ],
+          socialMedia: [
+            'Tạo nội dung video ngắn cho TikTok',
+            'Đăng bài thường xuyên trên Facebook và Instagram',
+            'Tương tác với comments của khách hàng'
+          ],
+          promotions: [
+            'Flash sale vào cuối tuần',
+            'Bundle deals cho đơn hàng lớn',
+            'Chương trình giới thiệu khách hàng mới'
+          ]
+        },
+        kpis: [
+          {
+            metric: 'Doanh số bán hàng',
+            target: `${formatCurrency(localFormData.budget * 3)}`,
+            timeframe: '30 ngày'
+          },
+          {
+            metric: 'Số lượng đơn hàng',
+            target: '100-150 đơn',
+            timeframe: '30 ngày'
+          },
+          {
+            metric: 'Tỷ lệ chuyển đổi',
+            target: '3-5%',
+            timeframe: 'Trung bình'
+          },
+          {
+            metric: 'Đánh giá shop',
+            target: '4.8/5 sao',
+            timeframe: 'Trung bình'
+          }
+        ]
+      };
+
       setMarketingPlan(plan);
-      handleChange('plan', plan);
+
+      // Cập nhật form data
+      setFormData(prev => ({
+        ...prev,
+        marketing: {
+          ...localFormData,
+          plan: plan
+        }
+      }));
+
     } catch (error) {
       console.error('Failed to generate marketing plan:', error);
     } finally {
@@ -1869,54 +2007,179 @@ export const MarketingStep = ({ formData, setFormData }) => {
     }
   };
 
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND'
+    }).format(amount);
+  };
+
   return (
     <div className="space-y-8">
-      {/* Marketing Budget Input */}
+      {/* Marketing Form */}
       <div className="bg-white p-6 rounded-lg shadow">
-        <h3 className="text-lg font-medium mb-4">Marketing Budget</h3>
-        <div className="space-y-4">
+        <h3 className="text-lg font-medium text-gray-900 mb-6">Lập kế hoạch marketing</h3>
+        <div className="space-y-6">
+          {/* Budget Input */}
           <div>
-            <label className="block text-sm font-medium text-gray-700">Monthly Budget</label>
+            <label className="block text-sm font-medium text-gray-700">
+              Ngân sách marketing (30 ngày)
+            </label>
             <div className="mt-1 relative rounded-md shadow-sm">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <span className="text-gray-500">₫</span>
               </div>
               <input
                 type="number"
-                value={formData.marketing.budget || ''}
+                value={localFormData.budget}
                 onChange={(e) => handleChange('budget', e.target.value)}
                 className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-7 pr-12 sm:text-sm border-gray-300 rounded-md"
+                placeholder="Nhập ngân sách của bạn"
               />
             </div>
           </div>
 
+          {/* Marketing Channels */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Kênh marketing
+            </label>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {marketingChannels.map((channel) => (
+                <label
+                  key={channel.id}
+                  className={`
+                    relative flex p-4 border rounded-lg cursor-pointer hover:border-indigo-500
+                    ${localFormData.selectedChannels.includes(channel.id) 
+                      ? 'border-indigo-500 ring-2 ring-indigo-500' 
+                      : 'border-gray-300'}
+                  `}
+                >
+                  <input
+                    type="checkbox"
+                    className="sr-only"
+                    checked={localFormData.selectedChannels.includes(channel.id)}
+                    onChange={(e) => {
+                      const newChannels = e.target.checked
+                        ? [...localFormData.selectedChannels, channel.id]
+                        : localFormData.selectedChannels.filter(id => id !== channel.id);
+                      handleChange('selectedChannels', newChannels);
+                    }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-sm font-medium text-gray-900">{channel.name}</h4>
+                    <p className="mt-1 text-sm text-gray-500">{channel.description}</p>
+                  </div>
+                  <div className={`
+                    ml-3 flex-shrink-0 w-5 h-5 border-2 rounded-full flex items-center justify-center
+                    ${localFormData.selectedChannels.includes(channel.id)
+                      ? 'border-indigo-500 bg-indigo-500'
+                      : 'border-gray-300 bg-white'}
+                  `}>
+                    {localFormData.selectedChannels.includes(channel.id) && (
+                      <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
+                        <path d="M3.5 6L5 7.5L8.5 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                      </svg>
+                    )}
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Target Audience */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Đối tượng mục tiêu
+            </label>
+            <textarea
+              value={localFormData.targetAudience}
+              onChange={(e) => handleChange('targetAudience', e.target.value)}
+              rows={3}
+              className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              placeholder="Mô tả đối tượng khách hàng mục tiêu của bạn"
+            />
+          </div>
+
           <button
             onClick={generateMarketingPlan}
-            className="w-full px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+            disabled={loading}
+            className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400"
           >
-            Generate Marketing Plan
+            {loading ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Đang tạo kế hoạch...
+              </>
+            ) : 'Tạo kế hoạch marketing'}
           </button>
         </div>
       </div>
 
-      {/* Marketing Plan */}
-      {loading ? (
-        <div className="text-center py-6">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="mt-2 text-gray-600">Generating marketing plan...</p>
-        </div>
-      ) : marketingPlan && (
-        <div className="space-y-6">
+      {/* Marketing Plan Results */}
+      {marketingPlan && (
+        <>
+          {/* Overview */}
+          <div className="bg-white p-6 rounded-lg shadow">
+            <h4 className="text-lg font-medium text-gray-900 mb-4">Tổng quan kế hoạch</h4>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <dt className="text-sm font-medium text-gray-500">Ngân sách</dt>
+                <dd className="mt-1 text-lg font-medium text-gray-900">
+                  {formatCurrency(marketingPlan.overview.totalBudget)}
+                </dd>
+              </div>
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <dt className="text-sm font-medium text-gray-500">Thời gian</dt>
+                <dd className="mt-1 text-lg font-medium text-gray-900">
+                  {marketingPlan.overview.duration}
+                </dd>
+              </div>
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <dt className="text-sm font-medium text-gray-500">Tiếp cận</dt>
+                <dd className="mt-1 text-lg font-medium text-gray-900">
+                  {marketingPlan.overview.estimatedReach}
+                </dd>
+              </div>
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <dt className="text-sm font-medium text-gray-500">ROI dự kiến</dt>
+                <dd className="mt-1 text-lg font-medium text-gray-900">
+                  {marketingPlan.overview.expectedROI}
+                </dd>
+              </div>
+            </div>
+          </div>
+
           {/* Budget Allocation */}
           <div className="bg-white p-6 rounded-lg shadow">
-            <h4 className="text-lg font-medium mb-4">Budget Allocation</h4>
-            <div className="grid grid-cols-2 gap-4">
+            <h4 className="text-lg font-medium text-gray-900 mb-4">Phân bổ ngân sách</h4>
+            <div className="space-y-4">
               {Object.entries(marketingPlan.budgetAllocation).map(([channel, amount]) => (
-                <div key={channel} className="p-4 bg-gray-50 rounded-lg">
-                  <p className="text-sm text-gray-600">{channel}</p>
-                  <p className="text-xl font-bold text-indigo-600">
-                    ₫{parseInt(amount).toLocaleString()}
-                  </p>
+                <div key={channel} className="flex items-center">
+                  <div className="flex-1">
+                    <div className="flex items-center">
+                      <span className="text-sm font-medium text-gray-900">
+                        {channel.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                      </span>
+                      <span className="ml-2 text-sm text-gray-500">
+                        {Math.round((amount / marketingPlan.overview.totalBudget) * 100)}%
+                      </span>
+                    </div>
+                    <div className="mt-1 relative pt-1">
+                      <div className="overflow-hidden h-2 text-xs flex rounded bg-gray-200">
+                        <div
+                          style={{ width: `${(amount / marketingPlan.overview.totalBudget) * 100}%` }}
+                          className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-indigo-500"
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="ml-4 text-sm font-medium text-gray-900">
+                    {formatCurrency(amount)}
+                  </div>
                 </div>
               ))}
             </div>
@@ -1924,48 +2187,110 @@ export const MarketingStep = ({ formData, setFormData }) => {
 
           {/* Marketing Calendar */}
           <div className="bg-white p-6 rounded-lg shadow">
-            <h4 className="text-lg font-medium mb-4">30-Day Marketing Calendar</h4>
-            <div className="border rounded-lg">
-              {marketingPlan.calendar.map((event, index) => (
-                <div
-                  key={index}
-                  className="p-4 border-b last:border-b-0 hover:bg-gray-50"
-                >
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="font-medium">{event.title}</p>
-                      <p className="text-sm text-gray-600">{event.description}</p>
-                    </div>
-                    <span className="text-sm text-gray-500">Day {event.day}</span>
-                  </div>
-                </div>
-              ))}
+            <h4 className="text-lg font-medium text-gray-900 mb-4">Lịch triển khai</h4>
+            <div className="overflow-hidden">
+              <div className="flow-root">
+                <ul className="-mb-8">
+                  {marketingPlan.calendar.map((event, index) => (
+                    <li key={event.day}>
+                      <div className="relative pb-8">
+                        {index < marketingPlan.calendar.length - 1 && (
+                          <span
+                            className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200"
+                            aria-hidden="true"
+                          />
+                        )}
+                        <div className="relative flex space-x-3">
+                          <div>
+                            <span className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center">
+                              {event.day}
+                            </span>
+                          </div>
+                          <div className="flex justify-between flex-1 min-w-0 pt-1.5">
+                            <div>
+                              <p className="text-sm text-gray-900">{event.activity}</p>
+                            </div>
+                            <div className="text-right text-sm whitespace-nowrap text-gray-600">
+                              {formatCurrency(event.budget)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           </div>
 
-          {/* Campaign Ideas */}
+          {/* Recommendations */}
           <div className="bg-white p-6 rounded-lg shadow">
-            <h4 className="text-lg font-medium mb-4">Campaign Ideas</h4>
-            <div className="space-y-4">
-              {marketingPlan.campaigns.map((campaign, index) => (
-                <div key={index} className="p-4 border rounded-lg">
-                  <h5 className="font-medium">{campaign.name}</h5>
-                  <p className="text-sm text-gray-600 mt-2">{campaign.description}</p>
-                  <div className="mt-2 flex gap-2">
-                    {campaign.tags.map((tag, tagIndex) => (
-                      <span
-                        key={tagIndex}
-                        className="px-2 py-1 bg-indigo-100 text-indigo-800 rounded-full text-xs"
-                      >
-                        {tag}
+            <h4 className="text-lg font-medium text-gray-900 mb-4">Đề xuất chiến lược</h4>
+            <div className="grid gap-6 md:grid-cols-3">
+              <div className="space-y-3">
+                <h5 className="font-medium text-indigo-600">Shopee Ads</h5>
+                <ul className="space-y-2">
+                  {marketingPlan.recommendations.shopeeAds.map((rec, index) => (
+                    <li key={index} className="flex items-start">
+                      <span className="flex-shrink-0 h-5 w-5 text-indigo-500">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
                       </span>
-                    ))}
-                  </div>
+                      <span className="ml-2 text-sm text-gray-600">{rec}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="space-y-3">
+                <h5 className="font-medium text-green-600">Social Media</h5>
+                <ul className="space-y-2">
+                  {marketingPlan.recommendations.socialMedia.map((rec, index) => (
+                    <li key={index} className="flex items-start">
+                      <span className="flex-shrink-0 h-5 w-5 text-green-500">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </span>
+                      <span className="ml-2 text-sm text-gray-600">{rec}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="space-y-3">
+                <h5 className="font-medium text-purple-600">Khuyến mãi</h5>
+                <ul className="space-y-2">
+                  {marketingPlan.recommendations.promotions.map((rec, index) => (
+                    <li key={index} className="flex items-start">
+                      <span className="flex-shrink-0 h-5 w-5 text-purple-500">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </span>
+                      <span className="ml-2 text-sm text-gray-600">{rec}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* KPIs */}
+          <div className="bg-white p-6 rounded-lg shadow">
+            <h4 className="text-lg font-medium text-gray-900 mb-4">Chỉ tiêu KPIs</h4>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {marketingPlan.kpis.map((kpi, index) => (
+                <div key={index} className="bg-gray-50 p-4 rounded-lg">
+                  <dt className="text-sm font-medium text-gray-500">{kpi.metric}</dt>
+                  <dd className="mt-1 text-lg font-medium text-gray-900">{kpi.target}</dd>
+                  <dd className="mt-1 text-sm text-gray-500">{kpi.timeframe}</dd>
                 </div>
               ))}
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
@@ -1973,207 +2298,469 @@ export const MarketingStep = ({ formData, setFormData }) => {
 
 // Step 7: Shop Setup
 export const ShopSetupStep = ({ formData, setFormData }) => {
+  const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [setupGuide, setSetupGuide] = useState(null);
 
-  const handleChange = (field, value) => {
-    setFormData({
-      ...formData,
+  const setupSteps = [
+    {
+      title: "Thiết lập thông tin cửa hàng",
+      fields: {
+        shopName: formData.shopSetup?.shopName || "",
+        shopDescription: formData.shopSetup?.shopDescription || "",
+        logo: formData.shopSetup?.logo || null
+      },
+      description: "Thông tin cơ bản về cửa hàng của bạn"
+    },
+    {
+      title: "Chính sách cửa hàng",
+      fields: {
+        returnPolicy: formData.shopSetup?.returnPolicy || "",
+        shippingPolicy: formData.shopSetup?.shippingPolicy || "",
+        warrantyPolicy: formData.shopSetup?.warrantyPolicy || ""
+      },
+      description: "Thiết lập các chính sách cho cửa hàng"
+    },
+    {
+      title: "Vận chuyển & Thanh toán",
+      fields: {
+        shippingMethods: formData.shopSetup?.shippingMethods || [],
+        paymentMethods: formData.shopSetup?.paymentMethods || []
+      },
+      description: "Cấu hình phương thức vận chuyển và thanh toán"
+    },
+    {
+      title: "Xác thực & Bảo mật",
+      fields: {
+        businessType: formData.shopSetup?.businessType || "",
+        identityNumber: formData.shopSetup?.identityNumber || "",
+        businessLicense: formData.shopSetup?.businessLicense || null
+      },
+      description: "Xác thực danh tính và giấy phép kinh doanh"
+    }
+  ];
+
+  const handleFieldChange = (stepIndex, field, value) => {
+    const updatedSteps = [...setupSteps];
+    updatedSteps[stepIndex].fields[field] = value;
+
+    setFormData(prev => ({
+      ...prev,
       shopSetup: {
-        ...formData.shopSetup,
+        ...prev.shopSetup,
         [field]: value
       }
-    });
+    }));
   };
 
-  const generateSetupGuide = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch('/api/shop/setup-guide', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          category: formData.specificCategory,
-          shopName: formData.shopSetup.name,
-          policies: formData.shopSetup.policies
-        })
-      });
-
-      const guide = await response.json();
-      setSetupGuide(guide);
-      handleChange('setupGuide', guide);
-    } catch (error) {
-      console.error('Failed to generate setup guide:', error);
-    } finally {
-      setLoading(false);
+  const validateStep = (stepIndex) => {
+    const step = setupSteps[stepIndex];
+    const fields = Object.entries(step.fields);
+    
+    for (const [field, value] of fields) {
+      if (!value && field !== 'logo' && field !== 'businessLicense') {
+        return false;
+      }
     }
+    return true;
   };
 
   return (
     <div className="space-y-8">
-      {/* Shop Information */}
+      {/* Progress Steps */}
       <div className="bg-white p-6 rounded-lg shadow">
-        <h3 className="text-lg font-medium mb-6">Shop Information</h3>
-        <div className="space-y-6">
-          {/* Basic Info */}
+        <div className="flex items-center justify-between mb-8">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Shop Name</label>
-            <input
-              type="text"
-              value={formData.shopSetup.name || ''}
-              onChange={(e) => handleChange('name', e.target.value)}
-              className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              placeholder="Enter your shop name"
-            />
+            <h3 className="text-lg font-medium text-gray-900">
+              Thiết lập cửa hàng
+            </h3>
+            <p className="mt-1 text-sm text-gray-500">
+              {setupSteps[currentStep].description}
+            </p>
+          </div>
+          <span className="text-sm text-gray-500">
+            Bước {currentStep + 1} / {setupSteps.length}
+          </span>
+        </div>
+
+        <div className="relative">
+          {/* Progress Bar */}
+          <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-gray-200">
+            <div
+              style={{ width: `${((currentStep + 1) / setupSteps.length) * 100}%` }}
+              className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-indigo-500"
+            ></div>
           </div>
 
-          {/* Shop Description */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Shop Description</label>
-            <textarea
-              value={formData.shopSetup.description || ''}
-              onChange={(e) => handleChange('description', e.target.value)}
-              rows={4}
-              className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              placeholder="Describe your shop..."
-            />
-          </div>
-
-          {/* Policies */}
-          <div className="space-y-4">
-            <h4 className="text-sm font-medium text-gray-700">Shop Policies</h4>
-            
-            {/* Return Policy */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Return Policy</label>
-              <textarea
-                value={formData.shopSetup.policies?.return || ''}
-                onChange={(e) => handleChange('policies', {
-                  ...formData.shopSetup.policies,
-                  return: e.target.value
-                })}
-                rows={3}
-                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              />
-            </div>
-
-            {/* Shipping Policy */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Shipping Policy</label>
-              <textarea
-                value={formData.shopSetup.policies?.shipping || ''}
-                onChange={(e) => handleChange('policies', {
-                  ...formData.shopSetup.policies,
-                  shipping: e.target.value
-                })}
-                rows={3}
-                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              />
-            </div>
-
-            {/* Warranty Policy */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Warranty Policy</label>
-              <textarea
-                value={formData.shopSetup.policies?.warranty || ''}
-                onChange={(e) => handleChange('policies', {
-                  ...formData.shopSetup.policies,
-                  warranty: e.target.value
-                })}
-                rows={3}
-                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              />
-            </div>
-          </div>
-
-          {/* Shipping Options */}
-          <div>
-            <h4 className="text-sm font-medium text-gray-700 mb-2">Shipping Options</h4>
-            <div className="space-y-2">
-              {['Standard', 'Express', 'Next Day'].map((option) => (
-                <label key={option} className="flex items-center">
+          {/* Step Content */}
+          <div className="mt-8">
+            {currentStep === 0 && (
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Tên cửa hàng
+                  </label>
                   <input
-                    type="checkbox"
-                    checked={(formData.shopSetup.shippingOptions || []).includes(option)}
-                    onChange={(e) => {
-                      const current = formData.shopSetup.shippingOptions || [];
-                      const updated = e.target.checked
-                        ? [...current, option]
-                        : current.filter(opt => opt !== option);
-                      handleChange('shippingOptions', updated);
-                    }}
-                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                    type="text"
+                    value={setupSteps[0].fields.shopName}
+                    onChange={(e) => handleFieldChange(0, 'shopName', e.target.value)}
+                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    placeholder="Nhập tên cửa hàng của bạn"
                   />
-                  <span className="ml-2 text-sm text-gray-700">{option}</span>
-                </label>
-              ))}
-            </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Mô tả cửa hàng
+                  </label>
+                  <textarea
+                    value={setupSteps[0].fields.shopDescription}
+                    onChange={(e) => handleFieldChange(0, 'shopDescription', e.target.value)}
+                    rows={4}
+                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    placeholder="Mô tả về cửa hàng của bạn"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Logo cửa hàng
+                  </label>
+                  <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
+                    <div className="space-y-1 text-center">
+                      <svg
+                        className="mx-auto h-12 w-12 text-gray-400"
+                        stroke="currentColor"
+                        fill="none"
+                        viewBox="0 0 48 48"
+                      >
+                        <path
+                          d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+                          strokeWidth={2}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                      <div className="flex text-sm text-gray-600">
+                        <label
+                          htmlFor="file-upload"
+                          className="relative cursor-pointer bg-white rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500"
+                        >
+                          <span>Tải ảnh lên</span>
+                          <input id="file-upload" name="file-upload" type="file" className="sr-only" />
+                        </label>
+                        <p className="pl-1">hoặc kéo thả file vào đây</p>
+                      </div>
+                      <p className="text-xs text-gray-500">PNG, JPG tối đa 2MB</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {currentStep === 1 && (
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Chính sách đổi trả
+                  </label>
+                  <textarea
+                    value={setupSteps[1].fields.returnPolicy}
+                    onChange={(e) => handleFieldChange(1, 'returnPolicy', e.target.value)}
+                    rows={4}
+                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    placeholder="Mô tả chính sách đổi trả của cửa hàng"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Chính sách vận chuyển
+                  </label>
+                  <textarea
+                    value={setupSteps[1].fields.shippingPolicy}
+                    onChange={(e) => handleFieldChange(1, 'shippingPolicy', e.target.value)}
+                    rows={4}
+                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    placeholder="Mô tả chính sách vận chuyển của cửa hàng"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Chính sách bảo hành
+                  </label>
+                  <textarea
+                    value={setupSteps[1].fields.warrantyPolicy}
+                    onChange={(e) => handleFieldChange(1, 'warrantyPolicy', e.target.value)}
+                    rows={4}
+                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    placeholder="Mô tả chính sách bảo hành của cửa hàng"
+                  />
+                </div>
+              </div>
+            )}
+
+            {currentStep === 2 && (
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Phương thức vận chuyển
+                  </label>
+                  <div className="mt-4 space-y-4">
+                    {[
+                      { id: 'standard', name: 'Tiêu chuẩn', desc: '3-5 ngày' },
+                      { id: 'express', name: 'Nhanh', desc: '1-2 ngày' },
+                      { id: 'sameday', name: 'Trong ngày', desc: '24 giờ' }
+                    ].map((method) => (
+                      <div key={method.id} className="flex items-start">
+                        <div className="flex items-center h-5">
+                          <input
+                            id={method.id}
+                            type="checkbox"
+                            checked={setupSteps[2].fields.shippingMethods.includes(method.id)}
+                            onChange={(e) => {
+                              const newMethods = e.target.checked
+                                ? [...setupSteps[2].fields.shippingMethods, method.id]
+                                : setupSteps[2].fields.shippingMethods.filter(id => id !== method.id);
+                              handleFieldChange(2, 'shippingMethods', newMethods);
+                            }}
+                            className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded"
+                          />
+                        </div>
+                        <div className="ml-3">
+                          <label htmlFor={method.id} className="font-medium text-gray-700">
+                            {method.name}
+                          </label>
+                          <p className="text-gray-500">{method.desc}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Phương thức thanh toán
+                  </label>
+                  <div className="mt-4 space-y-4">
+                    {[
+                      { id: 'cod', name: 'Thanh toán khi nhận hàng', desc: 'COD' },
+                      { id: 'bank', name: 'Chuyển khoản ngân hàng', desc: 'Internet Banking' },
+                      { id: 'wallet', name: 'Ví Shopee', desc: 'ShopeePay' }
+                    ].map((method) => (
+                      <div key={method.id} className="flex items-start">
+                        <div className="flex items-center h-5">
+                          <input
+                            id={method.id}
+                            type="checkbox"
+                            checked={setupSteps[2].fields.paymentMethods.includes(method.id)}
+                            onChange={(e) => {
+                              const newMethods = e.target.checked
+                                ? [...setupSteps[2].fields.paymentMethods, method.id]
+                                : setupSteps[2].fields.paymentMethods.filter(id => id !== method.id);
+                              handleFieldChange(2, 'paymentMethods', newMethods);
+                            }}
+                            className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded"
+                          />
+                        </div>
+                        <div className="ml-3">
+                          <label htmlFor={method.id} className="font-medium text-gray-700">
+                            {method.name}
+                          </label>
+                          <p className="text-gray-500">{method.desc}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {currentStep === 3 && (
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Loại hình kinh doanh
+                  </label>
+                  <select
+                    value={setupSteps[3].fields.businessType}
+                    onChange={(e) => handleFieldChange(3, 'businessType', e.target.value)}
+                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                  >
+                    <option value="">Chọn loại hình kinh doanh</option>
+                    <option value="personal">Cá nhân</option>
+                    <option value="company">Doanh nghiệp</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Số CMND/CCCD hoặc Mã số thuế
+                  </label>
+                  <input
+                    type="text"
+                    value={setupSteps[3].fields.identityNumber}
+                    onChange={(e) => handleFieldChange(3, 'identityNumber', e.target.value)}
+                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Giấy phép kinh doanh
+                  </label>
+                  <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
+                    <div className="space-y-1 text-center">
+                      <svg
+                        className="mx-auto h-12 w-12 text-gray-400"
+                        stroke="currentColor"
+                        fill="none"
+                        viewBox="0 0 48 48"
+                      >
+                        <path
+                          d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+                          strokeWidth={2}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                      <div className="flex text-sm text-gray-600">
+                        <label
+                          htmlFor="business-license"
+                          className="relative cursor-pointer bg-white rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500"
+                        >
+                          <span>Tải file lên</span>
+                          <input id="business-license" name="business-license" type="file" className="sr-only" />
+                        </label>
+                        <p className="pl-1">hoặc kéo thả file vào đây</p>
+                      </div>
+                      <p className="text-xs text-gray-500">PDF, JPG tối đa 5MB</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Navigation Buttons */}
+          <div className="mt-8 flex justify-between">
+            <button
+              type="button"
+              onClick={() => setCurrentStep(prev => prev - 1)}
+              disabled={currentStep === 0}
+              className={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-md ${
+                currentStep === 0
+                  ? 'text-gray-400 bg-gray-100 cursor-not-allowed'
+                  : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              Quay lại
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (currentStep < setupSteps.length - 1) {
+                  setCurrentStep(prev => prev + 1);
+                } else {
+                  // Submit form
+                  console.log('Submit form', formData);
+                }
+              }}
+              disabled={!validateStep(currentStep)}
+              className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white ${
+                validateStep(currentStep)
+                  ? 'bg-indigo-600 hover:bg-indigo-700'
+                  : 'bg-indigo-400 cursor-not-allowed'
+              }`}
+            >
+              {currentStep === setupSteps.length - 1 ? 'Hoàn thành' : 'Tiếp theo'}
+            </button>
+          </div>
+
+          {/* Instructions */}
+          <div className="mt-8 bg-gray-50 p-4 rounded-md">
+            <h4 className="text-base font-medium text-gray-900 mb-2">Tips:</h4>
+            {currentStep === 0 && (
+              <ul className="list-disc pl-5 text-sm text-gray-600 space-y-1">
+                <li>Chọn tên cửa hàng dễ nhớ và phù hợp với thương hiệu</li>
+                <li>Mô tả cửa hàng nên nêu bật điểm mạnh và giá trị cốt lõi</li>
+                <li>Logo nên có kích thước tối thiểu 500x500 pixels</li>
+              </ul>
+            )}
+            {currentStep === 1 && (
+              <ul className="list-disc pl-5 text-sm text-gray-600 space-y-1">
+                <li>Chính sách đổi trả rõ ràng giúp tăng niềm tin khách hàng</li>
+                <li>Chính sách vận chuyển nên bao gồm thời gian và phí ship</li>
+                <li>Chính sách bảo hành càng chi tiết càng tốt</li>
+              </ul>
+            )}
+            {currentStep === 2 && (
+              <ul className="list-disc pl-5 text-sm text-gray-600 space-y-1">
+                <li>Đa dạng phương thức vận chuyển giúp tăng tỷ lệ chuyển đổi</li>
+                <li>Nên hỗ trợ thanh toán khi nhận hàng (COD)</li>
+                <li>Tích hợp ShopeePay để tận dụng các chương trình khuyến mãi</li>
+              </ul>
+            )}
+            {currentStep === 3 && (
+              <ul className="list-disc pl-5 text-sm text-gray-600 space-y-1">
+                <li>Đảm bảo thông tin CMND/MST chính xác</li>
+                <li>Tải lên bản scan/ảnh chụp giấy tờ rõ nét</li>
+                <li>Hoàn thiện hồ sơ giúp tăng uy tín của shop</li>
+              </ul>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Generate Setup Guide */}
+      {/* Preview */}
       <div className="bg-white p-6 rounded-lg shadow">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-medium">Setup Checklist</h3>
-          <button
-            onClick={generateSetupGuide}
-            className="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
-          >
-            Generate Guide
-          </button>
-        </div>
-
-        {loading ? (
-          <div className="text-center py-6">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600 mx-auto"></div>
-            <p className="mt-2 text-gray-600">Generating setup guide...</p>
-          </div>
-        ) : setupGuide && (
-          <div className="space-y-6">
-            {/* Setup Steps */}
-            <div className="space-y-4">
-              {setupGuide.steps.map((step, index) => (
-                <div key={index} className="flex items-start space-x-3">
-                  <div className="flex-shrink-0">
-                    <div className="h-6 w-6 rounded-full bg-indigo-100 flex items-center justify-center">
-                      <span className="text-sm font-medium text-indigo-600">{index + 1}</span>
-                    </div>
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-900">{step.title}</h4>
-                    <p className="mt-1 text-sm text-gray-600">{step.description}</p>
-                    {step.tips && (
-                      <div className="mt-2 text-sm text-gray-500 bg-gray-50 p-2 rounded">
-                        <span className="font-medium">Tip:</span> {step.tips}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Xem trước cửa hàng</h3>
+        <div className="border rounded-lg p-4">
+          <div className="flex items-center space-x-4">
+            <div className="h-16 w-16 bg-gray-200 rounded-lg"></div>
+            <div>
+              <h4 className="font-medium text-gray-900">
+                {formData.shopSetup?.shopName || 'Tên cửa hàng'}
+              </h4>
+              <p className="text-sm text-gray-500">
+                {formData.shopSetup?.shopDescription || 'Mô tả cửa hàng'}
+              </p>
             </div>
-
-            {/* Additional Resources */}
-            <div className="border-t pt-4">
-              <h4 className="text-sm font-medium text-gray-900 mb-3">Helpful Resources</h4>
-              <ul className="space-y-2">
-                {setupGuide.resources.map((resource, index) => (
-                  <li key={index}>
-                    <a
-                      href={resource.url}
-                      className="text-sm text-indigo-600 hover:text-indigo-700"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {resource.title}
-                    </a>
-                    <p className="text-sm text-gray-500">{resource.description}</p>
+          </div>
+          <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
+            <div>
+              <span className="text-gray-500">Phương thức vận chuyển:</span>
+              <ul className="mt-1 space-y-1">
+                {formData.shopSetup?.shippingMethods?.map(method => (
+                  <li key={method} className="text-gray-900">
+                    {method === 'standard' && 'Tiêu chuẩn'}
+                    {method === 'express' && 'Nhanh'}
+                    {method === 'sameday' && 'Trong ngày'}
                   </li>
                 ))}
               </ul>
             </div>
+            <div>
+              <span className="text-gray-500">Thanh toán:</span>
+              <ul className="mt-1 space-y-1">
+                {formData.shopSetup?.paymentMethods?.map(method => (
+                  <li key={method} className="text-gray-900">
+                    {method === 'cod' && 'Thanh toán khi nhận hàng'}
+                    {method === 'bank' && 'Chuyển khoản'}
+                    {method === 'wallet' && 'Ví Shopee'}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <span className="text-gray-500">Loại hình:</span>
+              <p className="mt-1 text-gray-900">
+                {formData.shopSetup?.businessType === 'personal' ? 'Cá nhân' : 'Doanh nghiệp'}
+              </p>
+            </div>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
